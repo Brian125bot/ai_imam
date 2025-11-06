@@ -5,6 +5,34 @@
  * supports real-time word highlighting synchronized with text-to-speech playback.
  */
 
+// Fix: Add TypeScript type definitions for `Intl.Segmenter` to resolve type errors.
+// This is necessary because the default TypeScript lib may not include this newer API.
+// By wrapping this in `declare global`, we augment the global Intl namespace, making
+// it available throughout the project.
+declare global {
+  namespace Intl {
+    interface SegmenterOptions {
+      granularity?: 'grapheme' | 'word' | 'sentence';
+    }
+
+    interface Segment {
+      segment: string;
+      index: number;
+      isWordLike?: boolean;
+    }
+
+    interface Segments {
+      [Symbol.iterator](): IterableIterator<Segment>;
+      containing(codeUnitIndex: number): Segment | undefined;
+    }
+
+    class Segmenter {
+      constructor(locales?: string | string[], options?: SegmenterOptions);
+      segment(input: string): Segments;
+    }
+  }
+}
+
 import React, { useState, useEffect, useMemo } from 'react';
 import { Fatwa } from '../types';
 
@@ -13,7 +41,8 @@ interface FatwaDisplayProps {
   prompt: string;
 }
 
-// A simple component to render a word and handle markdown parsing for bold/italic.
+// A simple component to render a text segment and handle markdown parsing for bold/italic.
+// It no longer adds its own spacing, allowing for a perfect reconstruction of the original text.
 const Word: React.FC<{ children: string; isHighlighted: boolean }> = ({ children, isHighlighted }) => {
   // This regex handles bold, italic, and bold+italic markers.
   const content = children.replace(/(\*\*\*|___)(.*?)\1/g, '<strong><em>$2</em></strong>')
@@ -21,33 +50,73 @@ const Word: React.FC<{ children: string; isHighlighted: boolean }> = ({ children
                           .replace(/(\*|_)(.*?)\1/g, '<em>$2</em>');
                           
   const highlightClass = isHighlighted 
-    ? 'bg-amber-300/60 rounded-md px-1 -mx-1' 
+    ? 'bg-amber-300/60 rounded-md' 
     : '';
 
   return (
     <span 
       className={`transition-all duration-150 ${highlightClass}`}
-      dangerouslySetInnerHTML={{ __html: content + ' ' }}
+      dangerouslySetInnerHTML={{ __html: content }}
     />
   );
 };
 
 // A memoized component to render markdown text with highlighting capabilities.
-const MarkdownRenderer = React.memo(({ text, highlightCharIndex }: { text: string; highlightCharIndex: number }) => {
-  let charCounter = 0;
+// It now uses Intl.Segmenter for language-aware word splitting, which is crucial
+// for accurately handling scripts like Arabic with diacritics.
+const MarkdownRenderer = React.memo(({ text, highlightCharIndex, lang }: { text: string; highlightCharIndex: number; lang: string }) => {
+  
+  const paragraphs = useMemo(() => {
+    // Use Intl.Segmenter if available, otherwise fallback to a regex split that preserves whitespace.
+    const segmenter = window.Intl?.Segmenter ? new Intl.Segmenter(lang.split('-')[0], { granularity: 'word' }) : null;
+    
+    let paraOffset = 0;
+    const result = text.split('\n\n').map(paraText => {
+      const paraSegments: { text: string; isWordLike?: boolean; startIndex: number; endIndex: number; }[] = [];
+      if (segmenter) {
+        // Modern approach: Language-aware segmentation.
+        const segments = segmenter.segment(paraText);
+        for (const s of segments) {
+          paraSegments.push({
+            text: s.segment,
+            isWordLike: s.isWordLike,
+            startIndex: paraOffset + s.index,
+            endIndex: paraOffset + s.index + s.segment.length,
+          });
+        }
+      } else {
+        // Fallback for older browsers: split by whitespace but keep the delimiters.
+        let wordOffset = 0;
+        paraText.split(/(\s+)/).forEach(part => {
+          if (part.length > 0) {
+            const isWord = /\S/.test(part);
+            paraSegments.push({
+              text: part,
+              isWordLike: isWord,
+              startIndex: paraOffset + wordOffset,
+              endIndex: paraOffset + wordOffset + part.length,
+            });
+            wordOffset += part.length;
+          }
+        });
+      }
+      paraOffset += paraText.length + 2; // Account for the '\n\n' delimiter
+      return paraSegments;
+    });
 
-  // Memoize the parsed paragraphs to avoid re-computation on every highlight change.
-  const paragraphs = useMemo(() => text.split('\n\n').map(p => p.split(' ')), [text]);
+    return result;
+
+  }, [text, lang]);
 
   return (
     <>
-      {paragraphs.map((words, pIndex) => (
+      {paragraphs.map((segments, pIndex) => (
         <p key={pIndex} className="mb-4">
-          {words.map((word, wIndex) => {
-            const startCharIndex = charCounter;
-            charCounter += word.length + 1; // +1 for the space
-            const isHighlighted = highlightCharIndex >= startCharIndex && highlightCharIndex < charCounter;
-            return <Word key={wIndex} isHighlighted={isHighlighted}>{word}</Word>;
+          {segments.map((segment, sIndex) => {
+            const isHighlighted = !!segment.isWordLike && 
+                                  highlightCharIndex >= segment.startIndex && 
+                                  highlightCharIndex < segment.endIndex;
+            return <Word key={sIndex} isHighlighted={isHighlighted}>{segment.text}</Word>;
           })}
         </p>
       ))}
@@ -173,7 +242,7 @@ const FatwaDisplay: React.FC<FatwaDisplayProps> = ({ fatwa, prompt }) => {
             English Ruling
           </h2>
           <div className="prose prose-slate max-w-none text-lg leading-relaxed prose-strong:text-emerald-900 prose-em:text-emerald-800">
-             <MarkdownRenderer text={fatwa.englishFatwa} highlightCharIndex={highlight?.lang === 'english' ? highlight.charIndex : -1} />
+             <MarkdownRenderer text={fatwa.englishFatwa} highlightCharIndex={highlight?.lang === 'english' ? highlight.charIndex : -1} lang="en-US" />
           </div>
         </div>
 
@@ -183,7 +252,7 @@ const FatwaDisplay: React.FC<FatwaDisplayProps> = ({ fatwa, prompt }) => {
             الفتوى بالعربية
           </h2>
           <div className="prose prose-slate max-w-none text-3xl leading-loose text-right tracking-wide prose-strong:text-emerald-900 prose-strong:font-semibold">
-            <MarkdownRenderer text={fatwa.arabicFatwa} highlightCharIndex={highlight?.lang === 'arabic' ? highlight.charIndex : -1} />
+            <MarkdownRenderer text={fatwa.arabicFatwa} highlightCharIndex={highlight?.lang === 'arabic' ? highlight.charIndex : -1} lang="ar-SA" />
           </div>
         </div>
 
@@ -240,6 +309,7 @@ const FatwaDisplay: React.FC<FatwaDisplayProps> = ({ fatwa, prompt }) => {
               <select
                 id="arabic-voice-select"
                 value={selectedArabicVoice || ''}
+                // Fix: Corrected typo from `e.targe.value` to `e.target.value`
                 onChange={(e) => setSelectedArabicVoice(e.target.value)}
                 disabled={isSpeaking || arabicVoices.length === 0}
                 className={`${selectClasses} font-arabic`}
