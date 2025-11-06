@@ -1,6 +1,16 @@
+/**
+ * @file ErrorMessage.tsx
+ * A simple presentational component used to display error messages to the user
+ * in a standardized, noticeable format.
+ */
+
 import React from 'react';
 
+/**
+ * Props for the ErrorMessage component.
+ */
 interface ErrorMessageProps {
+  /** The error message string to be displayed. */
   message: string;
 }
 

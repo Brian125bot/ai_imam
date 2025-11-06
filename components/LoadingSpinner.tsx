@@ -1,18 +1,35 @@
+/**
+ * @file LoadingSpinner.tsx
+ * A component that displays an animated SVG spinner and a dynamic message.
+ * It is shown to the user while waiting for a response from the AI model.
+ */
+
 import React from 'react';
 
+/**
+ * Props for the LoadingSpinner component.
+ */
 interface LoadingSpinnerProps {
+  /** The message to display beneath the spinner. */
   message: string;
 }
 
 const LoadingSpinner: React.FC<LoadingSpinnerProps> = ({ message }) => {
   return (
     <div className="flex flex-col items-center justify-center pt-16 text-center animate-fade-in">
+       {/* 
+         This SVG is a stylized eight-pointed star, often used in Islamic art. 
+         It is animated to spin, providing a thematic and visually engaging loading indicator.
+         A linear gradient is used for the stroke color to add visual depth.
+       */}
        <svg 
         width="64" 
         height="64" 
         viewBox="0 0 100 100" 
         xmlns="http://www.w3.org/2000/svg" 
         className="animate-spin"
+        aria-label="Loading"
+        role="status"
       >
         <defs>
           <linearGradient id="spinner-gradient" x1="0%" y1="0%" x2="100%" y2="100%">

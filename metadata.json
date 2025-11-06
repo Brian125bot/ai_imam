@@ -1,5 +1,5 @@
 {
   "name": "Ai-Imam: Fatwas by Imam Ai-Kitab",
-  "description": "An AI-powered Imam that issues fatwas in a classical, scholarly style in both English and Arabic based on user prompts.",
+  "description": "An AI-powered virtual Imam that delivers well-structured Islamic legal rulings (fatwas) in a classical, scholarly style. Responds in both English and Arabic to user-submitted questions on Fiqh (Islamic jurisprudence).",
   "requestFramePermissions": []
 }
