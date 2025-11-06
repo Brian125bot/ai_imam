@@ -36,6 +36,17 @@ const LOADING_MESSAGES = [
   "The final fatwa is being prepared for issuance...",
 ];
 
+/**
+ * A list of example prompts to guide the user.
+ */
+const EXAMPLE_PROMPTS = [
+  "What is the ruling on fasting while traveling?",
+  "Is music permissible in Islam?",
+  "Explain the conditions for Zakat on wealth.",
+  "How should one perform the funeral prayer (Salat al-Janazah)?",
+];
+
+
 const App: React.FC = () => {
   // State to hold the successfully generated fatwa object.
   const [fatwa, setFatwa] = useState<Fatwa | null>(null);
@@ -43,7 +54,9 @@ const App: React.FC = () => {
   const [isLoading, setIsLoading] = useState<boolean>(false);
   // State to store any error messages from the API call.
   const [error, setError] = useState<string | null>(null);
-  // State to store the user's prompt, used to display alongside the fatwa.
+  // State for the controlled input in PromptForm.
+  const [prompt, setPrompt] = useState<string>('');
+  // State to store the user's prompt that generated the current fatwa.
   const [currentPrompt, setCurrentPrompt] = useState<string>('');
   // State for the currently displayed loading message.
   const [loadingMessage, setLoadingMessage] = useState<string>(LOADING_MESSAGES[0]);
@@ -83,7 +96,7 @@ const App: React.FC = () => {
    * and handles the success or error response.
    * Wrapped in useCallback for performance optimization.
    */
-  const handleGenerateFatwa = useCallback(async (prompt: string) => {
+  const handleGenerateFatwa = useCallback(async () => {
     // Basic validation to prevent empty submissions.
     if (!prompt.trim()) {
       setError("Please enter a question.");
@@ -104,41 +117,68 @@ const App: React.FC = () => {
     } finally {
       setIsLoading(false);
     }
-  }, []);
+  }, [prompt]);
 
   return (
     <div className="min-h-screen flex flex-col items-center justify-start p-4 sm:p-6 lg:p-8">
-      {/* Application Header */}
-      <header className="text-center my-8">
-        <h1 className="text-4xl sm:text-5xl lg:text-6xl font-bold text-orange-800 tracking-wider font-display">
-          Ai-Imam: Fatwas by Imam Ai-Kitab
-        </h1>
-        <p className="text-lg text-stone-600 mt-2 max-w-2xl mx-auto">
-          Seek guidance on matters of jurisprudence. Pose your question to receive a scholarly fatwa in English and Arabic.
-        </p>
-      </header>
+      <div className="w-full max-w-5xl mx-auto">
+        {/* Application Header */}
+        <header className="text-center my-8 border-b-2 border-[--border] pb-6">
+          <h1 className="text-4xl sm:text-5xl lg:text-6xl font-bold text-[--primary] tracking-wider font-display">
+            Ai-Imam: Fatwas by Imam Ai-Kitab
+          </h1>
+          <p className="text-lg text-slate-600 mt-4 max-w-3xl mx-auto">
+            Seek guidance on matters of jurisprudence. Pose your question to receive a scholarly fatwa in English and Arabic.
+          </p>
+        </header>
 
-      {/* Main Content Area */}
-      <main className="w-full max-w-4xl mx-auto">
-        <PromptForm onSubmit={handleGenerateFatwa} isLoading={isLoading} />
-        
-        {/* Conditional Rendering for Response Area */}
-        <div className="mt-8 min-h-[300px]">
-          {isLoading && <LoadingSpinner message={loadingMessage} />}
-          {error && <ErrorMessage message={error} />}
-          {fatwa && !isLoading && <FatwaDisplay fatwa={fatwa} prompt={currentPrompt} />}
-          {!isLoading && !error && !fatwa && (
-            <div className="text-center text-stone-500 pt-16">
-              <p>Your generated fatwa will appear here.</p>
+        {/* Main Content Area */}
+        <main className="w-full">
+          <PromptForm 
+            prompt={prompt}
+            onPromptChange={setPrompt}
+            onSubmit={handleGenerateFatwa} 
+            isLoading={isLoading} 
+          />
+          
+          {/* Example Prompts Section */}
+          {!isLoading && !fatwa && (
+             <div className="text-center mt-6 animate-fade-in">
+              <p className="text-slate-500 mb-3 text-sm">Or try one of these examples:</p>
+              <div className="flex flex-wrap justify-center gap-2 sm:gap-3">
+                {EXAMPLE_PROMPTS.map((example, index) => (
+                  <button
+                    key={index}
+                    onClick={() => setPrompt(example)}
+                    disabled={isLoading}
+                    className="px-4 py-1.5 bg-white/60 border border-[--border] text-sm text-[--primary] rounded-full hover:bg-emerald-50/80 hover:border-emerald-600/50 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed transform hover:scale-105"
+                  >
+                    {example}
+                  </button>
+                ))}
+              </div>
             </div>
           )}
-        </div>
-      </main>
-      
-      {/* Application Footer */}
-      <footer className="w-full max-w-4xl mx-auto text-center py-6 mt-8 text-stone-500 text-sm">
-          <p>This tool uses generative AI. Responses should be reviewed for accuracy. Not a substitute for a qualified Islamic scholar.</p>
-      </footer>
+         
+          
+          {/* Conditional Rendering for Response Area */}
+          <div className="mt-8 min-h-[300px]">
+            {isLoading && <LoadingSpinner message={loadingMessage} />}
+            {error && <ErrorMessage message={error} />}
+            {fatwa && !isLoading && <FatwaDisplay fatwa={fatwa} prompt={currentPrompt} />}
+            {!isLoading && !error && !fatwa && (
+              <div className="text-center text-slate-500 pt-16">
+                <p className="text-lg">Your generated fatwa will appear here.</p>
+              </div>
+            )}
+          </div>
+        </main>
+        
+        {/* Application Footer */}
+        <footer className="w-full text-center py-6 mt-8 text-slate-500 text-sm">
+            <p>This tool uses generative AI. Responses should be reviewed for accuracy. Not a substitute for a qualified Islamic scholar.</p>
+        </footer>
+      </div>
     </div>
   );
 };

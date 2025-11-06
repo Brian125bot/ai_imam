@@ -22,17 +22,37 @@
     <link href="https://fonts.googleapis.com/css2?family=Amiri:ital,wght@0,400;0,700;1,400;1,700&family=Cinzel+Decorative:wght@400;700;900&family=Lora:ital,wght@0,400..700;1,400..700&display=swap" rel="stylesheet">
     
     <style>
+      :root {
+        --background: #FDFBF5; /* A light, parchment-like color */
+        --foreground: #1E293B; /* Dark slate for text, high contrast */
+        --card: #FFFFFF;
+        --card-foreground: #1E293B;
+        --primary: #065F46; /* Deep, rich emerald green */
+        --primary-foreground: #F0FDF4;
+        --accent: #F59E0B; /* A warm, vibrant gold/amber */
+        --accent-foreground: #1E293B;
+        --border: #065F4633; /* Emerald green at 20% opacity */
+        --ring: #065F46;
+        --radius: 0.5rem;
+      }
+
+      @keyframes fadeIn {
+        from { opacity: 0; transform: translateY(-10px); }
+        to { opacity: 1; transform: translateY(0); }
+      }
+
       body {
-        background-color: #FAF3E0; /* Warm Sand color provides a gentle, paper-like background */
-        /* A subtle, repeating Islamic geometric pattern used as a background texture to enhance the theme. */
-        background-image: url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23D2691E' fill-opacity='0.06'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E");
-        font-family: 'Lora', serif; /* Default body font */
+        background-color: var(--background);
+        /* A more subtle, intricate Islamic pattern */
+        background-image: url("data:image/svg+xml,%3Csvg width='84' height='48' viewBox='0 0 84 48' xmlns='http://www.w3.org/2000/svg'%3E%3CtiledPattern id='g' width='84' height='48'%3E%3Cpath d='M84 24C84 24 84 24 84 24C84 24 84 24 84 24C84 24 84 24 84 24Z' fill='%23d2b48c' fill-opacity='0.05'/%3E%3Cpath d='M84 24L84 0L42 0L42 24L0 24L0 48L42 48L42 24L84 24Z' fill-opacity='0.05' fill='%23d2b48c'/%3E%3C/tiledPattern%3E%3Crect fill='url(%23g)' width='84' height='48'/%3E%3C/svg%3E");
+        font-family: 'Lora', serif;
+        animation: fadeIn 0.8s ease-out;
       }
       .font-display {
-        font-family: 'Cinzel Decorative', serif; /* Class for headings */
+        font-family: 'Cinzel Decorative', serif;
       }
       .font-arabic {
-        font-family: 'Amiri', serif; /* Class for Arabic text */
+        font-family: 'Amiri', serif;
       }
     </style>
   
@@ -52,7 +72,7 @@
 }
 </script>
 </head>
-  <body class="text-stone-800">
+  <body class="text-slate-800">
     <div id="root"></div>
     <script type="module" src="/index.tsx"></script>
   </body>

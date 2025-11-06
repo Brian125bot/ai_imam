@@ -33,8 +33,8 @@ const LoadingSpinner: React.FC<LoadingSpinnerProps> = ({ message }) => {
       >
         <defs>
           <linearGradient id="spinner-gradient" x1="0%" y1="0%" x2="100%" y2="100%">
-            <stop offset="0%" style={{ stopColor: '#DD6B20', stopOpacity: 1 }} />
-            <stop offset="100%" style={{ stopColor: '#38B2AC', stopOpacity: 1 }} />
+            <stop offset="0%" style={{ stopColor: 'var(--primary)', stopOpacity: 1 }} />
+            <stop offset="100%" style={{ stopColor: 'var(--accent)', stopOpacity: 1 }} />
           </linearGradient>
         </defs>
         <path 
@@ -51,7 +51,7 @@ const LoadingSpinner: React.FC<LoadingSpinnerProps> = ({ message }) => {
           opacity="0.2"
         />
       </svg>
-      <p className="text-orange-800 text-lg mt-4 transition-opacity duration-500">{message}</p>
+      <p className="text-[--primary] text-lg mt-4 transition-opacity duration-500">{message}</p>
     </div>
   );
 };
