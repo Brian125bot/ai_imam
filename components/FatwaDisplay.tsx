@@ -146,7 +146,7 @@ const FatwaDisplay: React.FC<FatwaDisplayProps> = ({ fatwa, prompt }) => {
             الفتوى بالعربية
           </h2>
           <div
-            className="prose prose-stone max-w-none text-3xl leading-loose text-right prose-strong:text-orange-900 prose-li:marker:text-teal-600"
+            className="prose prose-stone max-w-none text-3xl leading-loose text-right tracking-wide prose-strong:text-orange-900 prose-strong:font-semibold prose-li:marker:text-teal-600"
             dangerouslySetInnerHTML={arabicHtml}
           />
         </div>
