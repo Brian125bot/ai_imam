@@ -1,0 +1,5 @@
+{
+  "name": "Ai-Imam: Fatwas by Imam Ai-Kitab",
+  "description": "An AI-powered Imam that issues fatwas in a classical, scholarly style in both English and Arabic based on user prompts.",
+  "requestFramePermissions": []
+}
