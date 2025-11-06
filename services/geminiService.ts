@@ -72,9 +72,35 @@ export async function generateFatwa(prompt: string): Promise<Fatwa> {
       },
     });
 
-    // Extract, trim, and parse the JSON response text.
+    // Proactively check for non-OK finish reasons from the model, like safety blocks.
+    if (response.candidates && response.candidates.length > 0) {
+      const finishReason = response.candidates[0].finishReason;
+      if (finishReason && finishReason !== 'STOP' && finishReason !== 'MAX_TOKENS') {
+        switch (finishReason) {
+          case 'SAFETY':
+            throw new Error("The response was blocked due to safety concerns. Please modify your question.");
+          case 'RECITATION':
+             throw new Error("The response was blocked due to a data recitation policy. Please try a different question.");
+          default:
+            throw new Error(`The model stopped generating for an unexpected reason: ${finishReason}.`);
+        }
+      }
+    }
+    
     const jsonText = response.text.trim();
-    const parsedResponse = JSON.parse(jsonText);
+
+    // The model might return an empty response even with a STOP reason.
+    if (!jsonText) {
+        throw new Error("The AI returned an empty response. Please try rephrasing your question.");
+    }
+
+    let parsedResponse;
+    try {
+        parsedResponse = JSON.parse(jsonText);
+    } catch (parseError) {
+        console.error("Failed to parse JSON response:", jsonText, parseError);
+        throw new Error("The AI returned a response that could not be understood. Please try again.");
+    }
 
     // Validate the parsed object to ensure it matches the expected structure.
     if (parsedResponse.englishFatwa && parsedResponse.arabicFatwa) {
@@ -85,7 +111,31 @@ export async function generateFatwa(prompt: string): Promise<Fatwa> {
     }
   } catch (error) {
     console.error("Error generating fatwa:", error);
+    
+    let userFriendlyMessage = "An unknown error occurred. Please try again later.";
+
+    if (error instanceof Error) {
+        const errorMessage = error.message.toLowerCase();
+
+        // Check for specific error messages from the SDK/network layer.
+        // These are more specific and should be checked before the general message.
+        if (errorMessage.includes('api key not valid')) {
+            userFriendlyMessage = "Authentication failed. The provided API key is invalid or missing.";
+        } else if (errorMessage.includes('rate limit exceeded')) {
+            userFriendlyMessage = "The service is currently busy due to high demand. Please wait a moment and try again.";
+        } else if (errorMessage.includes('400 bad request') || errorMessage.includes('invalid argument')) {
+            userFriendlyMessage = "The request was invalid. This may be due to the content of the prompt.";
+        } else if (errorMessage.includes('500') || errorMessage.includes('internal error')) {
+            userFriendlyMessage = "The AI service is experiencing internal issues. Please try again later.";
+        } else if (error instanceof TypeError && errorMessage.includes('failed to fetch')) {
+             userFriendlyMessage = "A network error occurred. Please check your internet connection and try again.";
+        } else {
+            // Use the message from errors thrown within the try block (e.g., safety, parsing).
+            userFriendlyMessage = error.message;
+        }
+    }
+    
     // Rethrow a user-friendly error to be displayed in the UI.
-    throw new Error("Failed to generate fatwa. The model may be unable to respond to this query.");
+    throw new Error(userFriendlyMessage);
   }
 }

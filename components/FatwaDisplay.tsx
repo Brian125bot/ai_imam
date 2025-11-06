@@ -59,13 +59,47 @@ const MarkdownRenderer = React.memo(({ text, highlightCharIndex }: { text: strin
 const FatwaDisplay: React.FC<FatwaDisplayProps> = ({ fatwa, prompt }) => {
   const [isCopied, setIsCopied] = useState(false);
   const [highlight, setHighlight] = useState<{ lang: 'english' | 'arabic'; charIndex: number } | null>(null);
+  
+  // State for voice selection
+  const [englishVoices, setEnglishVoices] = useState<SpeechSynthesisVoice[]>([]);
+  const [arabicVoices, setArabicVoices] = useState<SpeechSynthesisVoice[]>([]);
+  const [selectedEnglishVoice, setSelectedEnglishVoice] = useState<string | undefined>();
+  const [selectedArabicVoice, setSelectedArabicVoice] = useState<string | undefined>();
+
   const isSpeaking = highlight !== null;
 
-  // Cleanup speech synthesis on component unmount.
+  // Effect to populate voices and clean up speech on unmount.
   useEffect(() => {
+    let isMounted = true;
+
+    const populateVoiceList = () => {
+      if (!isMounted) return;
+      const allVoices = window.speechSynthesis.getVoices();
+      if (allVoices.length === 0) return;
+
+      const eng = allVoices.filter(voice => voice.lang.startsWith('en-'));
+      const ara = allVoices.filter(voice => voice.lang.startsWith('ar-'));
+      
+      setEnglishVoices(eng);
+      setArabicVoices(ara);
+      
+      // Set default selected voice only if it hasn't been set by the user yet
+      setSelectedEnglishVoice(prev => prev ?? (eng.length > 0 ? eng[0].voiceURI : undefined));
+      setSelectedArabicVoice(prev => prev ?? (ara.length > 0 ? ara[0].voiceURI : undefined));
+    };
+
+    populateVoiceList();
+    if (speechSynthesis.onvoiceschanged !== undefined) {
+      speechSynthesis.onvoiceschanged = populateVoiceList;
+    }
+
     return () => {
+      isMounted = false;
       if (window.speechSynthesis.speaking) {
         window.speechSynthesis.cancel();
+      }
+      if (speechSynthesis.onvoiceschanged !== undefined) {
+        speechSynthesis.onvoiceschanged = null;
       }
     };
   }, []);
@@ -83,12 +117,12 @@ const FatwaDisplay: React.FC<FatwaDisplayProps> = ({ fatwa, prompt }) => {
   };
 
   const handleReadAloud = (language: 'english' | 'arabic') => {
-    // If the selected language is already playing, or any other is, cancel it.
+    // If any speech is active, cancel it.
     if (window.speechSynthesis.speaking) {
       window.speechSynthesis.cancel();
       setHighlight(null);
       // If we clicked the same button, it acts as a toggle off.
-      // If a different button, the rest of the function will start the new speech.
+      // If a different button was clicked, the rest of the function will start the new speech.
       if (highlight?.lang === language) {
           return;
       }
@@ -96,7 +130,17 @@ const FatwaDisplay: React.FC<FatwaDisplayProps> = ({ fatwa, prompt }) => {
 
     const textToRead = language === 'english' ? fatwa.englishFatwa : fatwa.arabicFatwa;
     const utterance = new SpeechSynthesisUtterance(textToRead);
-    utterance.lang = language === 'english' ? 'en-US' : 'ar-SA';
+
+    // Set the selected voice for the utterance
+    if (language === 'english' && selectedEnglishVoice) {
+      const voice = englishVoices.find(v => v.voiceURI === selectedEnglishVoice);
+      if (voice) utterance.voice = voice;
+      utterance.lang = 'en-US'; // Fallback lang
+    } else if (language === 'arabic' && selectedArabicVoice) {
+      const voice = arabicVoices.find(v => v.voiceURI === selectedArabicVoice);
+      if (voice) utterance.voice = voice;
+      utterance.lang = 'ar-SA'; // Fallback lang
+    }
     
     // onboundary event fires as speech progresses, providing the character index.
     utterance.onboundary = (e) => {
@@ -105,6 +149,7 @@ const FatwaDisplay: React.FC<FatwaDisplayProps> = ({ fatwa, prompt }) => {
     
     utterance.onend = () => setHighlight(null);
     utterance.onerror = (e) => {
+      // 'interrupted' is a common error when we call cancel(), so we ignore it.
       if (e.error !== 'interrupted') {
         console.error("Speech Synthesis Error:", e.error);
       }
@@ -116,6 +161,7 @@ const FatwaDisplay: React.FC<FatwaDisplayProps> = ({ fatwa, prompt }) => {
   
   const actionButtonClasses = "inline-flex items-center justify-center gap-2 px-4 py-2 bg-transparent border-2 border-[--primary] text-[--primary] font-bold rounded-lg transition-all duration-300 hover:bg-emerald-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-[--ring] disabled:opacity-50 disabled:cursor-not-allowed";
   const playingButtonClasses = "bg-[--primary] text-[--primary-foreground]";
+  const selectClasses = "bg-white/80 border border-[--border] rounded-md px-2 py-2 text-sm text-[--primary] focus:ring-2 focus:ring-[--ring] focus:outline-none disabled:opacity-50 cursor-pointer";
 
   return (
     <div className="w-full animate-fade-in space-y-8">
@@ -144,26 +190,74 @@ const FatwaDisplay: React.FC<FatwaDisplayProps> = ({ fatwa, prompt }) => {
       </div>
 
       {/* Action Buttons Section */}
-      <div className="flex flex-wrap justify-center items-center gap-4 border-t border-[--border] pt-6">
+      <div className="flex flex-col items-center gap-6 border-t border-[--border] pt-6">
         <button onClick={handleCopyToClipboard} disabled={isCopied} className={actionButtonClasses}>
           {isCopied ? "Copied!" : "Share Fatwa"}
         </button>
 
-        <button
-          onClick={() => handleReadAloud('english')}
-          className={`${actionButtonClasses} ${highlight?.lang === 'english' ? playingButtonClasses : ''}`}
-          aria-label={highlight?.lang === 'english' ? 'Stop reading English fatwa' : 'Read English fatwa aloud'}
-        >
-          <span>Read English</span>
-        </button>
+        <div className="flex flex-wrap justify-center items-center gap-x-8 gap-y-4">
+          {/* English Controls */}
+          <div className="flex items-center gap-3">
+            <button
+              onClick={() => handleReadAloud('english')}
+              className={`${actionButtonClasses} ${highlight?.lang === 'english' ? playingButtonClasses : ''}`}
+              aria-label={highlight?.lang === 'english' ? 'Stop reading English fatwa' : 'Read English fatwa aloud'}
+            >
+              <span>Read English</span>
+            </button>
+            <div className="relative">
+              <select
+                id="english-voice-select"
+                value={selectedEnglishVoice || ''}
+                onChange={(e) => setSelectedEnglishVoice(e.target.value)}
+                disabled={isSpeaking || englishVoices.length === 0}
+                className={selectClasses}
+                aria-label="Select English voice"
+              >
+                {englishVoices.length > 0 ? (
+                  englishVoices.map(voice => (
+                    <option key={voice.voiceURI} value={voice.voiceURI}>
+                      {voice.name} ({voice.lang})
+                    </option>
+                  ))
+                ) : (
+                  <option>No English voices</option>
+                )}
+              </select>
+            </div>
+          </div>
 
-        <button
-          onClick={() => handleReadAloud('arabic')}
-          className={`${actionButtonClasses} ${highlight?.lang === 'arabic' ? playingButtonClasses : ''}`}
-          aria-label={highlight?.lang === 'arabic' ? 'Stop reading Arabic fatwa' : 'Read Arabic fatwa aloud'}
-        >
-          <span className="font-arabic text-xl">قراءة الفتوى</span>
-        </button>
+          {/* Arabic Controls */}
+          <div className="flex items-center gap-3">
+            <button
+              onClick={() => handleReadAloud('arabic')}
+              className={`${actionButtonClasses} ${highlight?.lang === 'arabic' ? playingButtonClasses : ''}`}
+              aria-label={highlight?.lang === 'arabic' ? 'Stop reading Arabic fatwa' : 'Read Arabic fatwa aloud'}
+            >
+              <span className="font-arabic text-xl">قراءة الفتوى</span>
+            </button>
+             <div className="relative">
+              <select
+                id="arabic-voice-select"
+                value={selectedArabicVoice || ''}
+                onChange={(e) => setSelectedArabicVoice(e.target.value)}
+                disabled={isSpeaking || arabicVoices.length === 0}
+                className={`${selectClasses} font-arabic`}
+                aria-label="Select Arabic voice"
+              >
+                {arabicVoices.length > 0 ? (
+                  arabicVoices.map(voice => (
+                    <option key={voice.voiceURI} value={voice.voiceURI}>
+                      {voice.name} ({voice.lang})
+                    </option>
+                  ))
+                ) : (
+                  <option>لا توجد أصوات عربية</option>
+                )}
+              </select>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
   );
