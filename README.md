@@ -348,8 +348,8 @@ For issues, questions, or suggestions:
 
 <div align="center">
 
-**Built with ❤️ for the Muslim community**
+**the door is finished & peace**
 
-~the door is finished & peace~
+~~
 
 </div>
