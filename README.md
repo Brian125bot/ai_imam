@@ -350,6 +350,6 @@ For issues, questions, or suggestions:
 
 **Built with ❤️ for the Muslim community**
 
-*May this tool benefit seekers of knowledge*
+~the door is finished & peace~
 
 </div>
