@@ -56,60 +56,197 @@ const Word: React.FC<{ children: string; isHighlighted: boolean }> = ({ children
   );
 };
 
+/**
+ * Helper to segment text into words while preserving global indices.
+ */
+const segmentText = (text: string, lang: string, globalOffset: number) => {
+  const segmenter = window.Intl?.Segmenter ? new Intl.Segmenter(lang.split('-')[0], { granularity: 'word' }) : null;
+  const segments: { text: string; isWordLike?: boolean; startIndex: number; endIndex: number; }[] = [];
+
+  if (segmenter) {
+    const iter = segmenter.segment(text);
+    for (const s of iter) {
+      segments.push({
+        text: s.segment,
+        isWordLike: s.isWordLike,
+        startIndex: globalOffset + s.index,
+        endIndex: globalOffset + s.index + s.segment.length,
+      });
+    }
+  } else {
+    // Fallback for browsers without Intl.Segmenter
+    let wordOffset = 0;
+    text.split(/(\s+)/).forEach(part => {
+      if (part.length > 0) {
+        const isWord = /\S/.test(part);
+        segments.push({
+          text: part,
+          isWordLike: isWord,
+          startIndex: globalOffset + wordOffset,
+          endIndex: globalOffset + wordOffset + part.length,
+        });
+        wordOffset += part.length;
+      }
+    });
+  }
+  return segments;
+};
+
 // A memoized component to render markdown text with highlighting capabilities.
 const MarkdownRenderer = React.memo(({ text, highlightCharIndex, lang }: { text: string; highlightCharIndex: number; lang: string }) => {
   
-  const paragraphs = useMemo(() => {
-    const segmenter = window.Intl?.Segmenter ? new Intl.Segmenter(lang.split('-')[0], { granularity: 'word' }) : null;
+  const blocks = useMemo(() => {
+    // Split by double newlines to identify blocks
+    // We capture the delimiters to track accurate indices
+    const parts = text.split(/(\n{2,})/);
+    let cursor = 0;
     
-    let paraOffset = 0;
-    const result = text.split('\n\n').map(paraText => {
-      const paraSegments: { text: string; isWordLike?: boolean; startIndex: number; endIndex: number; }[] = [];
-      if (segmenter) {
-        const segments = segmenter.segment(paraText);
-        for (const s of segments) {
-          paraSegments.push({
-            text: s.segment,
-            isWordLike: s.isWordLike,
-            startIndex: paraOffset + s.index,
-            endIndex: paraOffset + s.index + s.segment.length,
-          });
-        }
-      } else {
-        let wordOffset = 0;
-        paraText.split(/(\s+)/).forEach(part => {
-          if (part.length > 0) {
-            const isWord = /\S/.test(part);
-            paraSegments.push({
-              text: part,
-              isWordLike: isWord,
-              startIndex: paraOffset + wordOffset,
-              endIndex: paraOffset + wordOffset + part.length,
-            });
-            wordOffset += part.length;
-          }
-        });
+    return parts.map((part, index) => {
+      const start = cursor;
+      cursor += part.length;
+
+      // If it's a separator (newlines), ignore it for rendering but keep index update
+      if (index % 2 !== 0) return null;
+      if (!part.trim()) return null;
+
+      // Identify block type
+      let type: 'paragraph' | 'blockquote' | 'ul' | 'ol' | 'header' = 'paragraph';
+      let cleanPart = part;
+      let prefixRegex: RegExp | null = null;
+
+      if (/^#{1,6}\s/.test(part)) {
+        type = 'header';
+        prefixRegex = /^(#{1,6}\s+)/;
+      } else if (/^>/.test(part)) {
+        type = 'blockquote';
+        prefixRegex = /^>\s?/;
+      } else if (/^[-*]\s/.test(part)) {
+        type = 'ul';
+        prefixRegex = /^[-*]\s+/;
+      } else if (/^\d+\.\s/.test(part)) {
+        type = 'ol';
+        prefixRegex = /^\d+\.\s+/;
       }
-      paraOffset += paraText.length + 2;
-      return paraSegments;
-    });
 
-    return result;
+      return {
+        type,
+        text: part,
+        start,
+        prefixRegex
+      };
+    }).filter(Boolean) as { 
+      type: 'paragraph' | 'blockquote' | 'ul' | 'ol' | 'header'; 
+      text: string; 
+      start: number; 
+      prefixRegex: RegExp | null 
+    }[];
 
-  }, [text, lang]);
+  }, [text]);
 
   return (
     <>
-      {paragraphs.map((segments, pIndex) => (
-        <p key={pIndex} className="mb-4">
-          {segments.map((segment, sIndex) => {
-            const isHighlighted = !!segment.isWordLike && 
-                                  highlightCharIndex >= segment.startIndex && 
-                                  highlightCharIndex < segment.endIndex;
-            return <Word key={sIndex} isHighlighted={isHighlighted}>{segment.text}</Word>;
-          })}
-        </p>
-      ))}
+      {blocks.map((block, i) => {
+        // Render Header
+        if (block.type === 'header') {
+          const prefixMatch = block.text.match(block.prefixRegex!);
+          const prefixLen = prefixMatch ? prefixMatch[0].length : 0;
+          // We only render the content after the # but segments need correct indices
+          const segments = segmentText(block.text, lang, block.start);
+          
+          return (
+            <h3 key={i} className="text-xl sm:text-2xl font-display font-bold text-[--primary] mt-6 mb-3">
+              {segments.map((seg, sIdx) => {
+                // Skip rendering the markdown syntax tokens
+                if (seg.endIndex <= block.start + prefixLen) return null;
+                
+                const isHighlighted = !!seg.isWordLike && 
+                                      highlightCharIndex >= seg.startIndex && 
+                                      highlightCharIndex < seg.endIndex;
+                return <Word key={sIdx} isHighlighted={isHighlighted}>{seg.text}</Word>;
+              })}
+            </h3>
+          );
+        }
+
+        // Render Blockquote
+        if (block.type === 'blockquote') {
+          // Split by lines to handle multi-line quotes properly if they have > on each line
+          const lines = block.text.split('\n');
+          let lineCursor = block.start;
+
+          return (
+            <blockquote key={i} className="border-l-4 border-amber-500 pl-4 py-2 my-5 bg-emerald-50/50 rounded-r-lg italic text-slate-700 shadow-sm">
+               {lines.map((line, lIdx) => {
+                 const prefixMatch = line.match(/^>\s?/);
+                 const prefixLen = prefixMatch ? prefixMatch[0].length : 0;
+                 const segments = segmentText(line, lang, lineCursor);
+                 lineCursor += line.length + 1; // +1 for newline
+
+                 return (
+                   <div key={lIdx}>
+                     {segments.map((seg, sIdx) => {
+                        if (seg.endIndex <= (lineCursor - line.length - 1) + prefixLen) return null;
+                        const isHighlighted = !!seg.isWordLike && 
+                                              highlightCharIndex >= seg.startIndex && 
+                                              highlightCharIndex < seg.endIndex;
+                        return <Word key={sIdx} isHighlighted={isHighlighted}>{seg.text}</Word>;
+                     })}
+                   </div>
+                 )
+               })}
+            </blockquote>
+          );
+        }
+
+        // Render Lists (UL / OL)
+        if (block.type === 'ul' || block.type === 'ol') {
+            const lines = block.text.split('\n');
+            let lineCursor = block.start;
+            const ListTag = block.type === 'ul' ? 'ul' : 'ol';
+            const listClasses = block.type === 'ul' 
+                ? "list-disc list-outside ml-6 space-y-2 my-4 marker:text-[--primary]" 
+                : "list-decimal list-outside ml-6 space-y-2 my-4 marker:text-[--primary] marker:font-bold";
+
+            return (
+                <ListTag key={i} className={listClasses}>
+                    {lines.map((line, lIdx) => {
+                        const prefixMatch = line.match(block.prefixRegex!); // Re-match per line as lists might have varying numbering
+                        // Basic fallback for list item prefix if regex fails on specific line
+                        const effectivePrefixLen = prefixMatch ? prefixMatch[0].length : (block.type === 'ul' ? 2 : 3); 
+                        
+                        const segments = segmentText(line, lang, lineCursor);
+                        const currentLineStart = lineCursor;
+                        lineCursor += line.length + 1;
+
+                        return (
+                            <li key={lIdx} className="pl-2 leading-relaxed">
+                                {segments.map((seg, sIdx) => {
+                                    if (seg.endIndex <= currentLineStart + effectivePrefixLen) return null;
+                                    const isHighlighted = !!seg.isWordLike && 
+                                                          highlightCharIndex >= seg.startIndex && 
+                                                          highlightCharIndex < seg.endIndex;
+                                    return <Word key={sIdx} isHighlighted={isHighlighted}>{seg.text}</Word>;
+                                })}
+                            </li>
+                        );
+                    })}
+                </ListTag>
+            )
+        }
+
+        // Render Paragraph (Default)
+        const segments = segmentText(block.text, lang, block.start);
+        return (
+          <p key={i} className="mb-4 leading-relaxed">
+            {segments.map((seg, sIdx) => {
+              const isHighlighted = !!seg.isWordLike && 
+                                    highlightCharIndex >= seg.startIndex && 
+                                    highlightCharIndex < seg.endIndex;
+              return <Word key={sIdx} isHighlighted={isHighlighted}>{seg.text}</Word>;
+            })}
+          </p>
+        );
+      })}
     </>
   );
 });
