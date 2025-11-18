@@ -1,7 +1,8 @@
 /**
  * @file LoadingSpinner.tsx
  * A component that displays an animated SVG spinner and a dynamic message.
- * It is shown to the user while waiting for a response from the AI model.
+ * It features a complex, geometric Islamic pattern (Rub el Hizb style) with multi-layered rotations
+ * to create a mesmerizing, culturally relevant loading state.
  */
 
 import React from 'react';
@@ -16,42 +17,95 @@ interface LoadingSpinnerProps {
 
 const LoadingSpinner: React.FC<LoadingSpinnerProps> = ({ message }) => {
   return (
-    <div className="flex flex-col items-center justify-center pt-16 text-center animate-fade-in">
-       {/* 
-         This SVG is a stylized eight-pointed star, often used in Islamic art. 
-         It is animated to spin, providing a thematic and visually engaging loading indicator.
-         A linear gradient is used for the stroke color to add visual depth.
-       */}
-       <svg 
-        width="64" 
-        height="64" 
-        viewBox="0 0 100 100" 
-        xmlns="http://www.w3.org/2000/svg" 
-        className="animate-spin"
-        aria-label="Loading"
-        role="status"
-      >
-        <defs>
-          <linearGradient id="spinner-gradient" x1="0%" y1="0%" x2="100%" y2="100%">
-            <stop offset="0%" style={{ stopColor: 'var(--primary)', stopOpacity: 1 }} />
-            <stop offset="100%" style={{ stopColor: 'var(--accent)', stopOpacity: 1 }} />
-          </linearGradient>
-        </defs>
-        <path 
-          d="M50 0 L61.2 25.8 L87.8 25.8 L68.3 41.2 L79.5 67 L50 51.6 L20.5 67 L31.7 41.2 L12.2 25.8 L38.8 25.8 Z"
-          fill="none" 
-          stroke="url(#spinner-gradient)" 
-          strokeWidth="6" 
-          strokeLinecap="round" 
-          strokeLinejoin="round"
-        />
-        <path
-          d="M50 12.5 L57.4 31.2 L78.1 31.2 L62.8 43.1 L70.2 61.8 L50 50 L29.8 61.8 L37.2 43.1 L21.9 31.2 L42.6 31.2 Z"
-          fill="url(#spinner-gradient)"
-          opacity="0.2"
-        />
-      </svg>
-      <p className="text-[--primary] text-lg mt-4 transition-opacity duration-500">{message}</p>
+    <div className="flex flex-col items-center justify-center pt-12 pb-8 text-center animate-fade-in w-full min-h-[300px]">
+      <div className="relative w-40 h-40 mb-10">
+         {/* 
+           Islamic Geometric Spinner 
+           Concept: Two interlaced squares (Rub el Hizb foundation) rotating in opposition,
+           surrounded by a decorative ring.
+         */}
+         <svg 
+          viewBox="0 0 100 100" 
+          className="w-full h-full drop-shadow-xl overflow-visible"
+          aria-label="Loading animation"
+          role="status"
+        >
+            <defs>
+              {/* Gradient for the primary square (Emerald) */}
+              <linearGradient id="grad-primary" x1="0%" y1="0%" x2="100%" y2="100%">
+                <stop offset="0%" stopColor="#065F46" stopOpacity="1" />
+                <stop offset="100%" stopColor="#065F46" stopOpacity="0.2" />
+              </linearGradient>
+              
+              {/* Gradient for the secondary square (Gold/Accent) */}
+              <linearGradient id="grad-accent" x1="100%" y1="0%" x2="0%" y2="100%">
+                <stop offset="0%" stopColor="#F59E0B" stopOpacity="1" />
+                <stop offset="100%" stopColor="#F59E0B" stopOpacity="0.2" />
+              </linearGradient>
+            </defs>
+
+            <style>
+                {`
+                    .spinner-origin { transform-origin: 50px 50px; }
+                    
+                    @keyframes spinner-cw { 
+                        from { transform: rotate(0deg); } 
+                        to { transform: rotate(360deg); } 
+                    }
+                    @keyframes spinner-ccw { 
+                        from { transform: rotate(0deg); } 
+                        to { transform: rotate(-360deg); } 
+                    }
+                    @keyframes spinner-pulse {
+                        0%, 100% { opacity: 0.5; transform: scale(0.9); }
+                        50% { opacity: 1; transform: scale(1.05); }
+                    }
+                    
+                    .animate-spinner-cw { animation: spinner-cw 16s linear infinite; }
+                    .animate-spinner-ccw { animation: spinner-ccw 16s linear infinite; }
+                    .animate-spinner-pulse { animation: spinner-pulse 3s ease-in-out infinite; }
+                    .animate-spinner-center { animation: spinner-cw 4s linear infinite; }
+                `}
+            </style>
+
+            {/* Outer Decorative Pattern Ring */}
+            <circle cx="50" cy="50" r="48" fill="none" stroke="#065F46" strokeWidth="0.5" strokeOpacity="0.2" />
+            <circle cx="50" cy="50" r="44" fill="none" stroke="#065F46" strokeWidth="0.5" strokeOpacity="0.1" strokeDasharray="4 4" className="spinner-origin animate-spinner-cw" style={{ animationDuration: '30s' }} />
+            
+            {/* Middle Ring Pulse */}
+            <circle cx="50" cy="50" r="38" fill="none" stroke="#F59E0B" strokeWidth="0.5" className="spinner-origin animate-spinner-pulse" />
+
+            {/* Square 1: Primary Emerald Color, Rotating Clockwise */}
+            <rect x="20" y="20" width="60" height="60" rx="1" fill="none" stroke="url(#grad-primary)" strokeWidth="2.5" className="spinner-origin animate-spinner-cw" />
+
+            {/* Square 2: Accent Gold Color, Rotating Counter-Clockwise. 
+                This counter-rotation against the first square creates the dynamic Rub el Hizb effect.
+            */}
+            <g className="spinner-origin animate-spinner-ccw">
+                 <rect x="20" y="20" width="60" height="60" rx="1" fill="none" stroke="url(#grad-accent)" strokeWidth="2.5" transform="rotate(45 50 50)" />
+            </g>
+
+            {/* Inner connecting lines for complexity */}
+            <g className="spinner-origin animate-spinner-cw" style={{ animationDuration: '8s' }}>
+                 <rect x="35" y="35" width="30" height="30" stroke="#065F46" strokeWidth="0.5" fill="none" transform="rotate(22.5 50 50)" opacity="0.5" />
+            </g>
+
+            {/* Center Motif: Small solid 8-pointed star */}
+            <g className="spinner-origin animate-spinner-pulse">
+                 <rect x="47" y="47" width="6" height="6" fill="#F59E0B" />
+                 <rect x="47" y="47" width="6" height="6" fill="#065F46" transform="rotate(45 50 50)" />
+            </g>
+            
+            {/* Center Dot */}
+             <circle cx="50" cy="50" r="1.5" fill="#FDFBF5" />
+
+        </svg>
+      </div>
+      
+      {/* Loading Message */}
+      <p className="text-emerald-800 font-display text-xl tracking-wide animate-pulse px-4 transition-all duration-500 font-medium">
+        {message}
+      </p>
     </div>
   );
 };

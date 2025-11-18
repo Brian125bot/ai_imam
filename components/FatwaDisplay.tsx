@@ -6,9 +6,6 @@
  */
 
 // Fix: Add TypeScript type definitions for `Intl.Segmenter` to resolve type errors.
-// This is necessary because the default TypeScript lib may not include this newer API.
-// By wrapping this in `declare global`, we augment the global Intl namespace, making
-// it available throughout the project.
 declare global {
   namespace Intl {
     interface SegmenterOptions {
@@ -42,15 +39,13 @@ interface FatwaDisplayProps {
 }
 
 // A simple component to render a text segment and handle markdown parsing for bold/italic.
-// It no longer adds its own spacing, allowing for a perfect reconstruction of the original text.
 const Word: React.FC<{ children: string; isHighlighted: boolean }> = ({ children, isHighlighted }) => {
-  // This regex handles bold, italic, and bold+italic markers.
   const content = children.replace(/(\*\*\*|___)(.*?)\1/g, '<strong><em>$2</em></strong>')
                           .replace(/(\*\*|__)(.*?)\1/g, '<strong>$2</strong>')
                           .replace(/(\*|_)(.*?)\1/g, '<em>$2</em>');
                           
   const highlightClass = isHighlighted 
-    ? 'bg-amber-300/60 rounded-md' 
+    ? 'bg-amber-300/60 rounded-md shadow-sm ring-2 ring-amber-300/30' 
     : '';
 
   return (
@@ -62,19 +57,15 @@ const Word: React.FC<{ children: string; isHighlighted: boolean }> = ({ children
 };
 
 // A memoized component to render markdown text with highlighting capabilities.
-// It now uses Intl.Segmenter for language-aware word splitting, which is crucial
-// for accurately handling scripts like Arabic with diacritics.
 const MarkdownRenderer = React.memo(({ text, highlightCharIndex, lang }: { text: string; highlightCharIndex: number; lang: string }) => {
   
   const paragraphs = useMemo(() => {
-    // Use Intl.Segmenter if available, otherwise fallback to a regex split that preserves whitespace.
     const segmenter = window.Intl?.Segmenter ? new Intl.Segmenter(lang.split('-')[0], { granularity: 'word' }) : null;
     
     let paraOffset = 0;
     const result = text.split('\n\n').map(paraText => {
       const paraSegments: { text: string; isWordLike?: boolean; startIndex: number; endIndex: number; }[] = [];
       if (segmenter) {
-        // Modern approach: Language-aware segmentation.
         const segments = segmenter.segment(paraText);
         for (const s of segments) {
           paraSegments.push({
@@ -85,7 +76,6 @@ const MarkdownRenderer = React.memo(({ text, highlightCharIndex, lang }: { text:
           });
         }
       } else {
-        // Fallback for older browsers: split by whitespace but keep the delimiters.
         let wordOffset = 0;
         paraText.split(/(\s+)/).forEach(part => {
           if (part.length > 0) {
@@ -100,7 +90,7 @@ const MarkdownRenderer = React.memo(({ text, highlightCharIndex, lang }: { text:
           }
         });
       }
-      paraOffset += paraText.length + 2; // Account for the '\n\n' delimiter
+      paraOffset += paraText.length + 2;
       return paraSegments;
     });
 
@@ -134,10 +124,12 @@ const FatwaDisplay: React.FC<FatwaDisplayProps> = ({ fatwa, prompt }) => {
   const [arabicVoices, setArabicVoices] = useState<SpeechSynthesisVoice[]>([]);
   const [selectedEnglishVoice, setSelectedEnglishVoice] = useState<string | undefined>();
   const [selectedArabicVoice, setSelectedArabicVoice] = useState<string | undefined>();
+  
+  // State for playback rate
+  const [playbackRate, setPlaybackRate] = useState(1);
 
   const isSpeaking = highlight !== null;
 
-  // Effect to populate voices and clean up speech on unmount.
   useEffect(() => {
     let isMounted = true;
 
@@ -152,7 +144,6 @@ const FatwaDisplay: React.FC<FatwaDisplayProps> = ({ fatwa, prompt }) => {
       setEnglishVoices(eng);
       setArabicVoices(ara);
       
-      // Set default selected voice only if it hasn't been set by the user yet
       setSelectedEnglishVoice(prev => prev ?? (eng.length > 0 ? eng[0].voiceURI : undefined));
       setSelectedArabicVoice(prev => prev ?? (ara.length > 0 ? ara[0].voiceURI : undefined));
     };
@@ -173,8 +164,27 @@ const FatwaDisplay: React.FC<FatwaDisplayProps> = ({ fatwa, prompt }) => {
     };
   }, []);
 
+  /**
+   * Adjusts the playback speed, clamping it between 0.5x and 2.0x.
+   */
+  const adjustRate = (amount: number) => {
+    setPlaybackRate(prev => {
+        const newRate = Math.max(0.5, Math.min(2, prev + amount));
+        return parseFloat(newRate.toFixed(2)); 
+    });
+  };
+
+  /**
+   * Stops any currently active speech synthesis.
+   */
+  const handleStopSpeech = () => {
+    if (window.speechSynthesis.speaking) {
+      window.speechSynthesis.cancel();
+      setHighlight(null);
+    }
+  };
+
   const handleCopyToClipboard = () => {
-    // A simplified text version for sharing.
     const stripMarkdown = (md: string) => md.replace(/[\*_`#]/g, '');
     const shareableText = `Question:\n${prompt}\n\n--- English Ruling ---\n${stripMarkdown(fatwa.englishFatwa)}\n\n--- الفتوى بالعربية ---\n${stripMarkdown(fatwa.arabicFatwa)}`;
     navigator.clipboard.writeText(shareableText).then(() => {
@@ -186,12 +196,9 @@ const FatwaDisplay: React.FC<FatwaDisplayProps> = ({ fatwa, prompt }) => {
   };
 
   const handleReadAloud = (language: 'english' | 'arabic') => {
-    // If any speech is active, cancel it.
     if (window.speechSynthesis.speaking) {
       window.speechSynthesis.cancel();
       setHighlight(null);
-      // If we clicked the same button, it acts as a toggle off.
-      // If a different button was clicked, the rest of the function will start the new speech.
       if (highlight?.lang === language) {
           return;
       }
@@ -199,26 +206,26 @@ const FatwaDisplay: React.FC<FatwaDisplayProps> = ({ fatwa, prompt }) => {
 
     const textToRead = language === 'english' ? fatwa.englishFatwa : fatwa.arabicFatwa;
     const utterance = new SpeechSynthesisUtterance(textToRead);
+    
+    // Apply the current playback rate.
+    utterance.rate = playbackRate;
 
-    // Set the selected voice for the utterance
     if (language === 'english' && selectedEnglishVoice) {
       const voice = englishVoices.find(v => v.voiceURI === selectedEnglishVoice);
       if (voice) utterance.voice = voice;
-      utterance.lang = 'en-US'; // Fallback lang
+      utterance.lang = 'en-US'; 
     } else if (language === 'arabic' && selectedArabicVoice) {
       const voice = arabicVoices.find(v => v.voiceURI === selectedArabicVoice);
       if (voice) utterance.voice = voice;
-      utterance.lang = 'ar-SA'; // Fallback lang
+      utterance.lang = 'ar-SA'; 
     }
     
-    // onboundary event fires as speech progresses, providing the character index.
     utterance.onboundary = (e) => {
       setHighlight({ lang: language, charIndex: e.charIndex });
     };
     
     utterance.onend = () => setHighlight(null);
     utterance.onerror = (e) => {
-      // 'interrupted' is a common error when we call cancel(), so we ignore it.
       if (e.error !== 'interrupted') {
         console.error("Speech Synthesis Error:", e.error);
       }
@@ -231,13 +238,14 @@ const FatwaDisplay: React.FC<FatwaDisplayProps> = ({ fatwa, prompt }) => {
   const actionButtonClasses = "inline-flex items-center justify-center gap-2 px-4 py-2 bg-transparent border-2 border-[--primary] text-[--primary] font-bold rounded-lg transition-all duration-300 hover:bg-emerald-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-[--ring] disabled:opacity-50 disabled:cursor-not-allowed";
   const playingButtonClasses = "bg-[--primary] text-[--primary-foreground]";
   const selectClasses = "bg-white/80 border border-[--border] rounded-md px-2 py-2 text-sm text-[--primary] focus:ring-2 focus:ring-[--ring] focus:outline-none disabled:opacity-50 cursor-pointer";
+  const rateButtonClasses = "w-8 h-8 flex items-center justify-center font-bold bg-emerald-100 text-[--primary] rounded-full hover:bg-emerald-200 disabled:opacity-50 disabled:cursor-not-allowed transition-colors";
 
   return (
     <div className="w-full animate-fade-in space-y-8">
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
         
         {/* English Fatwa Card */}
-        <div className="bg-white/60 border border-[--border] rounded-lg shadow-lg p-6 sm:p-8 backdrop-blur-sm">
+        <div className="bg-white/80 border border-[--border] rounded-lg shadow-xl p-6 sm:p-8 backdrop-blur-md">
           <h2 className="text-2xl font-bold text-[--primary] mb-4 border-b-2 border-[--border] pb-2 font-display">
             English Ruling
           </h2>
@@ -247,7 +255,7 @@ const FatwaDisplay: React.FC<FatwaDisplayProps> = ({ fatwa, prompt }) => {
         </div>
 
         {/* Arabic Fatwa Card */}
-        <div dir="rtl" className="font-arabic bg-white/60 border border-[--border] rounded-lg shadow-lg p-6 sm:p-8 backdrop-blur-sm">
+        <div dir="rtl" className="font-arabic bg-white/80 border border-[--border] rounded-lg shadow-xl p-6 sm:p-8 backdrop-blur-md">
           <h2 className="text-2xl font-bold text-[--primary] mb-4 border-b-2 border-[--border] pb-2 font-display">
             الفتوى بالعربية
           </h2>
@@ -259,74 +267,78 @@ const FatwaDisplay: React.FC<FatwaDisplayProps> = ({ fatwa, prompt }) => {
       </div>
 
       {/* Action Buttons Section */}
-      <div className="flex flex-col items-center gap-6 border-t border-[--border] pt-6">
+      <div className="flex flex-col items-center gap-6 border-t border-[--border] pt-8">
+        
+        {/* Share and Copy */}
         <button onClick={handleCopyToClipboard} disabled={isCopied} className={actionButtonClasses}>
           {isCopied ? "Copied!" : "Share Fatwa"}
         </button>
-
-        <div className="flex flex-wrap justify-center items-center gap-x-8 gap-y-4">
-          {/* English Controls */}
-          <div className="flex items-center gap-3">
-            <button
-              onClick={() => handleReadAloud('english')}
-              className={`${actionButtonClasses} ${highlight?.lang === 'english' ? playingButtonClasses : ''}`}
-              aria-label={highlight?.lang === 'english' ? 'Stop reading English fatwa' : 'Read English fatwa aloud'}
-            >
-              <span>Read English</span>
-            </button>
-            <div className="relative">
-              <select
-                id="english-voice-select"
-                value={selectedEnglishVoice || ''}
-                onChange={(e) => setSelectedEnglishVoice(e.target.value)}
-                disabled={isSpeaking || englishVoices.length === 0}
-                className={selectClasses}
-                aria-label="Select English voice"
-              >
-                {englishVoices.length > 0 ? (
-                  englishVoices.map(voice => (
-                    <option key={voice.voiceURI} value={voice.voiceURI}>
-                      {voice.name} ({voice.lang})
-                    </option>
-                  ))
-                ) : (
-                  <option>No English voices</option>
-                )}
-              </select>
+        
+        {/* Playback Controls Panel */}
+        <div className="w-full max-w-4xl p-6 border border-[--border] rounded-xl bg-white/60 shadow-inner flex flex-col gap-6">
+            
+            {/* Header & Stop Button */}
+            <div className="flex justify-between items-center border-b border-slate-200 pb-4">
+                <h3 className="text-lg font-semibold text-slate-700">Voice Controls</h3>
+                <button 
+                    onClick={handleStopSpeech} 
+                    disabled={!isSpeaking} 
+                    className="px-4 py-1.5 bg-red-100 text-red-700 rounded-md font-bold hover:bg-red-200 disabled:opacity-30 disabled:cursor-not-allowed transition-colors text-sm flex items-center gap-2"
+                >
+                   <span className="w-3 h-3 bg-red-600 rounded-sm block"></span> Stop Playback
+                </button>
             </div>
-          </div>
 
-          {/* Arabic Controls */}
-          <div className="flex items-center gap-3">
-            <button
-              onClick={() => handleReadAloud('arabic')}
-              className={`${actionButtonClasses} ${highlight?.lang === 'arabic' ? playingButtonClasses : ''}`}
-              aria-label={highlight?.lang === 'arabic' ? 'Stop reading Arabic fatwa' : 'Read Arabic fatwa aloud'}
-            >
-              <span className="font-arabic text-xl">قراءة الفتوى</span>
-            </button>
-             <div className="relative">
-              <select
-                id="arabic-voice-select"
-                value={selectedArabicVoice || ''}
-                // Fix: Corrected typo from `e.targe.value` to `e.target.value`
-                onChange={(e) => setSelectedArabicVoice(e.target.value)}
-                disabled={isSpeaking || arabicVoices.length === 0}
-                className={`${selectClasses} font-arabic`}
-                aria-label="Select Arabic voice"
-              >
-                {arabicVoices.length > 0 ? (
-                  arabicVoices.map(voice => (
-                    <option key={voice.voiceURI} value={voice.voiceURI}>
-                      {voice.name} ({voice.lang})
-                    </option>
-                  ))
-                ) : (
-                  <option>لا توجد أصوات عربية</option>
-                )}
-              </select>
+            <div className="flex flex-col md:flex-row justify-between items-center gap-6">
+                
+                {/* Playback Speed */}
+                <div className="flex items-center gap-3 bg-slate-50 p-2 rounded-lg border border-slate-200">
+                    <span className="text-xs font-bold text-slate-500 uppercase tracking-wider pl-2">Speed</span>
+                    <button onClick={() => adjustRate(-0.25)} disabled={isSpeaking || playbackRate <= 0.5} className={rateButtonClasses} aria-label="Decrease speed">-</button>
+                    <span className="text-lg font-bold text-[--primary] w-16 text-center tabular-nums">{playbackRate.toFixed(2)}x</span>
+                    <button onClick={() => adjustRate(0.25)} disabled={isSpeaking || playbackRate >= 2} className={rateButtonClasses} aria-label="Increase speed">+</button>
+                </div>
+
+                {/* English Controls */}
+                <div className="flex flex-col sm:flex-row items-center gap-3">
+                  <button
+                    onClick={() => handleReadAloud('english')}
+                    className={`${actionButtonClasses} ${highlight?.lang === 'english' ? playingButtonClasses : ''} text-sm`}
+                  >
+                    <span>Read English</span>
+                  </button>
+                  <select
+                    value={selectedEnglishVoice || ''}
+                    onChange={(e) => setSelectedEnglishVoice(e.target.value)}
+                    disabled={isSpeaking || englishVoices.length === 0}
+                    className={selectClasses}
+                  >
+                    {englishVoices.length > 0 ? (
+                      englishVoices.map(voice => <option key={voice.voiceURI} value={voice.voiceURI}>{voice.name}</option>)
+                    ) : <option>No English voices</option>}
+                  </select>
+                </div>
+
+                {/* Arabic Controls */}
+                <div className="flex flex-col sm:flex-row items-center gap-3">
+                  <button
+                    onClick={() => handleReadAloud('arabic')}
+                    className={`${actionButtonClasses} ${highlight?.lang === 'arabic' ? playingButtonClasses : ''} text-sm`}
+                  >
+                    <span className="font-arabic text-lg">قراءة الفتوى</span>
+                  </button>
+                  <select
+                    value={selectedArabicVoice || ''}
+                    onChange={(e) => setSelectedArabicVoice(e.target.value)}
+                    disabled={isSpeaking || arabicVoices.length === 0}
+                    className={`${selectClasses} font-arabic`}
+                  >
+                    {arabicVoices.length > 0 ? (
+                      arabicVoices.map(voice => <option key={voice.voiceURI} value={voice.voiceURI}>{voice.name}</option>)
+                    ) : <option>لا توجد أصوات عربية</option>}
+                  </select>
+                </div>
             </div>
-          </div>
         </div>
       </div>
     </div>

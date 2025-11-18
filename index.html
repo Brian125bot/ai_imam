@@ -15,64 +15,84 @@
     
     <!-- 
       Font Selection:
-      - 'Amiri': A classical Arabic Naskh typeface, chosen for its authenticity and readability for the Arabic fatwa.
-      - 'Cinzel Decorative': A stylish, classical font used for display headings to evoke a sense of tradition and authority.
-      - 'Lora': A well-balanced serif typeface, chosen for its excellent readability for the main English body text.
+      - 'Amiri': A classical Arabic typeface optimized for long-form reading (Naskh style).
+      - 'Cinzel Decorative': For English headers, providing a dignified, timeless feel.
+      - 'Lato': For English body text, ensuring high readability.
     -->
-    <link href="https://fonts.googleapis.com/css2?family=Amiri:ital,wght@0,400;0,700;1,400;1,700&family=Cinzel+Decorative:wght@400;700;900&family=Lora:ital,wght@0,400..700;1,400..700&display=swap" rel="stylesheet">
-    
+    <link href="https://fonts.googleapis.com/css2?family=Amiri:ital,wght@0,400;0,700;1,400&family=Cinzel+Decorative:wght@400;700&family=Lato:wght@400;700&display=swap" rel="stylesheet">
+
+    <script>
+      tailwind.config = {
+        theme: {
+          extend: {
+            colors: {
+              // Define CSS variables for dynamic theming if needed later
+              '--primary': '#065F46', // Emerald 800
+              '--primary-foreground': '#FFFFFF',
+              '--secondary': '#ECFDF5', // Emerald 50
+              '--accent': '#D97706', // Amber 600
+              '--border': '#E5E7EB', // Gray 200
+              '--ring': '#059669', // Emerald 600
+            },
+            fontFamily: {
+              'sans': ['Lato', 'sans-serif'],
+              'display': ['Cinzel Decorative', 'cursive'],
+              'arabic': ['Amiri', 'serif'],
+            },
+            animation: {
+              'fade-in': 'fadeIn 0.5s ease-out forwards',
+            },
+            keyframes: {
+              fadeIn: {
+                '0%': { opacity: '0', transform: 'translateY(10px)' },
+                '100%': { opacity: '1', transform: 'translateY(0)' },
+              }
+            }
+          }
+        }
+      }
+    </script>
     <style>
-      :root {
-        --background: #FDFBF5; /* A light, parchment-like color */
-        --foreground: #1E293B; /* Dark slate for text, high contrast */
-        --card: #FFFFFF;
-        --card-foreground: #1E293B;
-        --primary: #065F46; /* Deep, rich emerald green */
-        --primary-foreground: #F0FDF4;
-        --accent: #F59E0B; /* A warm, vibrant gold/amber */
-        --accent-foreground: #1E293B;
-        --border: #065F4633; /* Emerald green at 20% opacity */
-        --ring: #065F46;
-        --radius: 0.5rem;
-      }
-
-      @keyframes fadeIn {
-        from { opacity: 0; transform: translateY(-10px); }
-        to { opacity: 1; transform: translateY(0); }
-      }
-
       body {
-        background-color: var(--background);
-        /* A more subtle, intricate Islamic pattern */
-        background-image: url("data:image/svg+xml,%3Csvg width='84' height='48' viewBox='0 0 84 48' xmlns='http://www.w3.org/2000/svg'%3E%3CtiledPattern id='g' width='84' height='48'%3E%3Cpath d='M84 24C84 24 84 24 84 24C84 24 84 24 84 24C84 24 84 24 84 24Z' fill='%23d2b48c' fill-opacity='0.05'/%3E%3Cpath d='M84 24L84 0L42 0L42 24L0 24L0 48L42 48L42 24L84 24Z' fill-opacity='0.05' fill='%23d2b48c'/%3E%3C/tiledPattern%3E%3Crect fill='url(%23g)' width='84' height='48'/%3E%3C/svg%3E");
-        font-family: 'Lora', serif;
-        animation: fadeIn 0.8s ease-out;
+        /* 
+           Background:
+           1. A radial gradient overlay to create a vignette effect (lighter in center, darker at edges).
+           2. A repeating geometric SVG pattern to simulate mosque tiles.
+        */
+        background-color: #F3F4F6;
+        background-image: 
+          radial-gradient(circle at center, rgba(255,255,255,0.8) 0%, rgba(243,244,246,0.5) 100%),
+          url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23065F46' fill-opacity='0.05'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E");
+        background-attachment: fixed;
       }
-      .font-display {
-        font-family: 'Cinzel Decorative', serif;
+      
+      /* Custom scrollbar for a polished look */
+      ::-webkit-scrollbar {
+        width: 10px;
       }
-      .font-arabic {
-        font-family: 'Amiri', serif;
+      ::-webkit-scrollbar-track {
+        background: #ECFDF5; 
+      }
+      ::-webkit-scrollbar-thumb {
+        background: #059669; 
+        border-radius: 5px;
+      }
+      ::-webkit-scrollbar-thumb:hover {
+        background: #047857; 
       }
     </style>
-  
-  <!-- 
-    ES Module Import Map:
-    This allows for using bare module specifiers (e.g., "react") in JavaScript modules,
-    mapping them directly to CDN URLs. It simplifies dependency management without a build step.
-  -->
   <script type="importmap">
 {
   "imports": {
+    "@google/genai": "https://aistudiocdn.com/@google/genai@^1.30.0",
     "react/": "https://aistudiocdn.com/react@^19.2.0/",
     "react": "https://aistudiocdn.com/react@^19.2.0",
-    "@google/genai": "https://aistudiocdn.com/@google/genai@^1.29.0",
     "react-dom/": "https://aistudiocdn.com/react-dom@^19.2.0/"
   }
 }
 </script>
 </head>
-  <body class="text-slate-800">
+  <body class="text-slate-800 antialiased selection:bg-emerald-200 selection:text-emerald-900">
     <div id="root"></div>
     <script type="module" src="/index.tsx"></script>
   </body>

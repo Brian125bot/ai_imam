@@ -120,14 +120,14 @@ const App: React.FC = () => {
   }, [prompt]);
 
   return (
-    <div className="min-h-screen flex flex-col items-center justify-start p-4 sm:p-6 lg:p-8">
+    <div className="min-h-screen flex flex-col items-center justify-start p-4 sm:p-6 lg:p-8 relative z-10">
       <div className="w-full max-w-5xl mx-auto">
         {/* Application Header */}
-        <header className="text-center my-8 border-b-2 border-[--border] pb-6">
-          <h1 className="text-4xl sm:text-5xl lg:text-6xl font-bold text-[--primary] tracking-wider font-display">
+        <header className="text-center my-8 border-b-2 border-[--border] pb-6 bg-white/40 backdrop-blur-sm rounded-xl p-6 shadow-sm">
+          <h1 className="text-4xl sm:text-5xl lg:text-6xl font-bold tracking-wider font-display bg-gradient-to-r from-emerald-900 via-amber-500 to-emerald-900 text-transparent bg-clip-text pb-2">
             Ai-Imam: Fatwas by Imam Ai-Kitab
           </h1>
-          <p className="text-lg text-slate-600 mt-4 max-w-3xl mx-auto">
+          <p className="text-lg text-emerald-900/80 mt-4 max-w-3xl mx-auto font-medium">
             Seek guidance on matters of jurisprudence. Pose your question to receive a scholarly fatwa in English and Arabic.
           </p>
         </header>
@@ -144,14 +144,14 @@ const App: React.FC = () => {
           {/* Example Prompts Section */}
           {!isLoading && !fatwa && (
              <div className="text-center mt-6 animate-fade-in">
-              <p className="text-slate-500 mb-3 text-sm">Or try one of these examples:</p>
+              <p className="text-slate-600 mb-3 text-sm font-medium">Or try one of these examples:</p>
               <div className="flex flex-wrap justify-center gap-2 sm:gap-3">
                 {EXAMPLE_PROMPTS.map((example, index) => (
                   <button
                     key={index}
                     onClick={() => setPrompt(example)}
                     disabled={isLoading}
-                    className="px-4 py-1.5 bg-white/60 border border-[--border] text-sm text-[--primary] rounded-full hover:bg-emerald-50/80 hover:border-emerald-600/50 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed transform hover:scale-105"
+                    className="px-4 py-1.5 bg-white/70 border border-[--border] text-sm text-[--primary] rounded-full hover:bg-emerald-50 hover:border-emerald-600/50 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed transform hover:scale-105 shadow-sm"
                   >
                     {example}
                   </button>
@@ -175,7 +175,7 @@ const App: React.FC = () => {
         </main>
         
         {/* Application Footer */}
-        <footer className="w-full text-center py-6 mt-8 text-slate-500 text-sm">
+        <footer className="w-full text-center py-6 mt-8 text-slate-600 text-sm font-medium bg-white/40 rounded-lg backdrop-blur-sm">
             <p>This tool uses generative AI. Responses should be reviewed for accuracy. Not a substitute for a qualified Islamic scholar.</p>
         </footer>
       </div>
